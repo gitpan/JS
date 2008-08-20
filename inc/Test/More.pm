@@ -1,8 +1,7 @@
 #line 1
 package Test::More;
 
-use 5.004;
-
+use 5.006;
 use strict;
 
 
@@ -17,7 +16,7 @@ sub _carp {
 
 
 use vars qw($VERSION @ISA @EXPORT %EXPORT_TAGS $TODO);
-$VERSION = '0.62';
+$VERSION = '0.80';
 $VERSION = eval $VERSION;    # make the alpha version come out as a number
 
 use Test::Builder::Module;
@@ -32,11 +31,11 @@ use Test::Builder::Module;
              plan
              can_ok  isa_ok
              diag
-	     BAIL_OUT
+             BAIL_OUT
             );
 
 
-#line 157
+#line 156
 
 sub plan {
     my $tb = Test::More->builder;
@@ -70,7 +69,7 @@ sub import_extra {
 }
 
 
-#line 257
+#line 256
 
 sub ok ($;$) {
     my($test, $name) = @_;
@@ -79,7 +78,7 @@ sub ok ($;$) {
     $tb->ok($test, $name);
 }
 
-#line 324
+#line 323
 
 sub is ($$;$) {
     my $tb = Test::More->builder;
@@ -96,7 +95,7 @@ sub isnt ($$;$) {
 *isn't = \&isnt;
 
 
-#line 369
+#line 368
 
 sub like ($$;$) {
     my $tb = Test::More->builder;
@@ -105,7 +104,7 @@ sub like ($$;$) {
 }
 
 
-#line 385
+#line 384
 
 sub unlike ($$;$) {
     my $tb = Test::More->builder;
@@ -114,7 +113,7 @@ sub unlike ($$;$) {
 }
 
 
-#line 425
+#line 424
 
 sub cmp_ok($$$;$) {
     my $tb = Test::More->builder;
@@ -123,12 +122,18 @@ sub cmp_ok($$$;$) {
 }
 
 
-#line 461
+#line 460
 
 sub can_ok ($@) {
     my($proto, @methods) = @_;
     my $class = ref $proto || $proto;
     my $tb = Test::More->builder;
+
+    unless( $class ) {
+        my $ok = $tb->ok( 0, "->can(...)" );
+        $tb->diag('    can_ok() called with empty class or reference');
+        return $ok;
+    }
 
     unless( @methods ) {
         my $ok = $tb->ok( 0, "$class->can(...)" );
@@ -138,15 +143,13 @@ sub can_ok ($@) {
 
     my @nok = ();
     foreach my $method (@methods) {
-        local($!, $@);  # don't interfere with caller's $@
-                        # eval sometimes resets $!
-        eval { $proto->can($method) } || push @nok, $method;
+        $tb->_try(sub { $proto->can($method) }) or push @nok, $method;
     }
 
     my $name;
     $name = @methods == 1 ? "$class->can('$methods[0]')" 
                           : "$class->can(...)";
-    
+
     my $ok = $tb->ok( !@nok, $name );
 
     $tb->diag(map "    $class->can('$_') failed\n", @nok);
@@ -154,7 +157,7 @@ sub can_ok ($@) {
     return $ok;
 }
 
-#line 519
+#line 522
 
 sub isa_ok ($$;$) {
     my($object, $class, $obj_name) = @_;
@@ -171,10 +174,10 @@ sub isa_ok ($$;$) {
     }
     else {
         # We can't use UNIVERSAL::isa because we want to honor isa() overrides
-        local($@, $!);  # eval sometimes resets $!
-        my $rslt = eval { $object->isa($class) };
-        if( $@ ) {
-            if( $@ =~ /^Can't call method "isa" on unblessed reference/ ) {
+        my($rslt, $error) = $tb->_try(sub { $object->isa($class) });
+        if( $error ) {
+            if( $error =~ /^Can't call method "isa" on unblessed reference/ ) {
+                # Its an unblessed reference
                 if( !UNIVERSAL::isa($object, $class) ) {
                     my $ref = ref $object;
                     $diag = "$obj_name isn't a '$class' it's a '$ref'";
@@ -182,9 +185,8 @@ sub isa_ok ($$;$) {
             } else {
                 die <<WHOA;
 WHOA! I tried to call ->isa on your object and got some weird error.
-This should never happen.  Please contact the author immediately.
 Here's the error.
-$@
+$error
 WHOA
             }
         }
@@ -209,7 +211,7 @@ WHOA
 }
 
 
-#line 589
+#line 591
 
 sub pass (;$) {
     my $tb = Test::More->builder;
@@ -221,7 +223,7 @@ sub fail (;$) {
     $tb->ok(0, @_);
 }
 
-#line 650
+#line 652
 
 sub use_ok ($;@) {
     my($module, @imports) = @_;
@@ -230,32 +232,35 @@ sub use_ok ($;@) {
 
     my($pack,$filename,$line) = caller;
 
-    local($@,$!);   # eval sometimes interferes with $!
-
+    my $code;
     if( @imports == 1 and $imports[0] =~ /^\d+(?:\.\d+)?$/ ) {
         # probably a version check.  Perl needs to see the bare number
         # for it to work with non-Exporter based modules.
-        eval <<USE;
+        $code = <<USE;
 package $pack;
 use $module $imports[0];
+1;
 USE
     }
     else {
-        eval <<USE;
+        $code = <<USE;
 package $pack;
-use $module \@imports;
+use $module \@{\$args[0]};
+1;
 USE
     }
 
-    my $ok = $tb->ok( !$@, "use $module;" );
 
+    my($eval_result, $eval_error) = _eval($code, \@imports);
+    my $ok = $tb->ok( $eval_result, "use $module;" );
+    
     unless( $ok ) {
-        chomp $@;
+        chomp $eval_error;
         $@ =~ s{^BEGIN failed--compilation aborted at .*$}
                 {BEGIN failed--compilation aborted at $filename line $line.}m;
         $tb->diag(<<DIAGNOSTIC);
     Tried to use '$module'.
-    Error:  $@
+    Error:  $eval_error
 DIAGNOSTIC
 
     }
@@ -263,7 +268,21 @@ DIAGNOSTIC
     return $ok;
 }
 
-#line 699
+
+sub _eval {
+    my($code) = shift;
+    my @args = @_;
+
+    # Work around oddities surrounding resetting of $@ by immediately
+    # storing it.
+    local($@,$!,$SIG{__DIE__});   # isolate eval
+    my $eval_result = eval $code;
+    my $eval_error  = $@;
+
+    return($eval_result, $eval_error);
+}
+
+#line 718
 
 sub require_ok ($) {
     my($module) = shift;
@@ -275,19 +294,20 @@ sub require_ok ($) {
     # Module names must be barewords, files not.
     $module = qq['$module'] unless _is_module_name($module);
 
-    local($!, $@); # eval sometimes interferes with $!
-    eval <<REQUIRE;
+    my $code = <<REQUIRE;
 package $pack;
 require $module;
+1;
 REQUIRE
 
-    my $ok = $tb->ok( !$@, "require $module;" );
+    my($eval_result, $eval_error) = _eval($code);
+    my $ok = $tb->ok( $eval_result, "require $module;" );
 
     unless( $ok ) {
-        chomp $@;
+        chomp $eval_error;
         $tb->diag(<<DIAGNOSTIC);
     Tried to require '$module'.
-    Error:  $@
+    Error:  $eval_error
 DIAGNOSTIC
 
     }
@@ -306,10 +326,16 @@ sub _is_module_name {
     $module =~ /^[a-zA-Z]\w*$/;
 }
 
-#line 775
+#line 795
 
 use vars qw(@Data_Stack %Refs_Seen);
 my $DNE = bless [], 'Does::Not::Exist';
+
+sub _dne {
+    ref $_[0] eq ref $DNE;
+}
+
+
 sub is_deeply {
     my $tb = Test::More->builder;
 
@@ -326,21 +352,21 @@ WARNING
 	return $tb->ok(0);
     }
 
-    my($this, $that, $name) = @_;
+    my($got, $expected, $name) = @_;
 
-    $tb->_unoverload_str(\$that, \$this);
+    $tb->_unoverload_str(\$expected, \$got);
 
     my $ok;
-    if( !ref $this and !ref $that ) {  		# neither is a reference
-        $ok = $tb->is_eq($this, $that, $name);
+    if( !ref $got and !ref $expected ) {  		# neither is a reference
+        $ok = $tb->is_eq($got, $expected, $name);
     }
-    elsif( !ref $this xor !ref $that ) {  	# one's a reference, one isn't
+    elsif( !ref $got xor !ref $expected ) {  	# one's a reference, one isn't
         $ok = $tb->ok(0, $name);
-	$tb->diag( _format_stack({ vals => [ $this, $that ] }) );
+	$tb->diag( _format_stack({ vals => [ $got, $expected ] }) );
     }
     else {			       		# both references
         local @Data_Stack = ();
-        if( _deep_check($this, $that) ) {
+        if( _deep_check($got, $expected) ) {
             $ok = $tb->ok(1, $name);
         }
         else {
@@ -382,8 +408,8 @@ sub _format_stack {
     foreach my $idx (0..$#vals) {
         my $val = $vals[$idx];
         $vals[$idx] = !defined $val ? 'undef'          :
-                      $val eq $DNE  ? "Does not exist" :
-	              ref $val      ? "$val"           :
+                      _dne($val)    ? "Does not exist" :
+                      ref $val      ? "$val"           :
                                       "'$val'";
     }
 
@@ -407,7 +433,7 @@ sub _type {
     return '';
 }
 
-#line 915
+#line 941
 
 sub diag {
     my $tb = Test::More->builder;
@@ -416,7 +442,7 @@ sub diag {
 }
 
 
-#line 984
+#line 1010
 
 #'#
 sub skip {
@@ -430,6 +456,11 @@ sub skip {
         $how_many = 1;
     }
 
+    if( defined $how_many and $how_many =~ /\D/ ) {
+        _carp "skip() was passed a non-numeric number of tests.  Did you get the arguments backwards?";
+        $how_many = 1;
+    }
+
     for( 1..$how_many ) {
         $tb->skip($why);
     }
@@ -439,7 +470,7 @@ sub skip {
 }
 
 
-#line 1066
+#line 1097
 
 sub todo_skip {
     my($why, $how_many) = @_;
@@ -460,7 +491,7 @@ sub todo_skip {
     last TODO;
 }
 
-#line 1119
+#line 1150
 
 sub BAIL_OUT {
     my $reason = shift;
@@ -469,7 +500,7 @@ sub BAIL_OUT {
     $tb->BAIL_OUT($reason);
 }
 
-#line 1158
+#line 1189
 
 #'#
 sub eq_array {
@@ -527,7 +558,7 @@ sub _deep_check {
         if( defined $e1 xor defined $e2 ) {
             $ok = 0;
         }
-        elsif ( $e1 == $DNE xor $e2 == $DNE ) {
+        elsif ( _dne($e1) xor _dne($e2) ) {
             $ok = 0;
         }
         elsif ( $same_ref and ($e1 eq $e2) ) {
@@ -593,7 +624,7 @@ WHOA
 }
 
 
-#line 1289
+#line 1320
 
 sub eq_hash {
     local @Data_Stack;
@@ -626,7 +657,7 @@ sub _eq_hash {
     return $ok;
 }
 
-#line 1346
+#line 1377
 
 sub eq_set  {
     my($a1, $a2) = @_;
@@ -652,6 +683,6 @@ sub eq_set  {
     );
 }
 
-#line 1534
+#line 1567
 
 1;
