@@ -4,7 +4,7 @@ use warnings;
 use File::Find;
 use 5.008;
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 
 sub new {
     my $class = shift;
