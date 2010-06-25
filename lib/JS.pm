@@ -1,497 +1,253 @@
-package JS;
-use 5.008;
-use strict;
-use warnings;
+# Copyright (C) 2010  Juan-Manuel Torres-Moreno
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# -----	Divergence de Jensesn-Shannon   	V 0.3     7-10 decembre 2009
+#  	Juan-Manuel Torres-Moreno LIA/Avignon   juan-manuel.torres@univ-avignon.fr
+package JS ;
+our $VERSION = '0.0130';
+use Exporter;
+our @ISA = qw(Exporter);
+our @EXPORT = qw(&jensen_shannon);
 
-use DynaLoader;
-use Carp;
-
-our $VERSION;
-BEGIN {
-    $VERSION = "0.99_06";
-    our @ISA = qw(DynaLoader);
-    DynaLoader::bootstrap('JS', $VERSION);
+use strict ;
+#------------------ Divergence de Jensen-Shannon : P = DISTRIBUTION_P ; P = P_w ; Q = DISTRIBUTION_Q ; Q = Q_w, w = symbols
+# 	JS 	= 0.5 * SUM_w P Log ( P /(P+Q)/2 ) + Q Log ( Q/(P+Q)/2 ) 
+# 	   	= 0.5 * SUM_w P Log ( 2P_w/(P_w+Q_w) ) + Q_w Log ( 2Q_w/(P_w+Q_w) )
+sub jensen_shannon {
+	my ($P, $Q) = @_;			# $P=pointeur dist P, $Q=pointeur dist Q  
+	my $log_2   = log(2) ;		# Logarithme base 2
+   	my %deja_vu = () ;			# Identifier les symboles de la distribution P
+   	map{ $deja_vu{$_}++ } (keys %$P) ;
+	my @symbols = sort keys %deja_vu ;	# Symbols de la distribution P
+     	my $js      = 0 ; 					# init Jensen-Shannon
+     	foreach my $mot (@symbols) { 		# Calcul de la divergence Jensen-Shannon
+		$js 	+= $P->{$mot} * log( 2*$P->{$mot} / ( $P->{$mot} + $Q->{$mot} ) )/$log_2 	# P Log ( P /(P+Q)/2 )
+			+  $Q->{$mot} * log( 2*$Q->{$mot} / ( $P->{$mot} + $Q->{$mot} ) )/$log_2 	# Q Log ( Q /(P+Q)/2 )
+     	}
+     	return $js/2 ;						# retourner divergence Jensen-Shannon
 }
-
-use JS::Boolean;
-use constant JS_TRUE  => JS::Boolean::True();
-use constant JS_FALSE => JS::Boolean::False();
-
-use constant JS_NULL => 0; # TODO
-
-use Exporter qw(import);
-
-use constant JS_PROP_PRIVATE      => 0x1;
-use constant JS_PROP_READONLY     => 0x2;
-use constant JS_PROP_ACCESSOR     => 0x4;
-use constant JS_CLASS_NO_INSTANCE => 0x1;
-
-our @EXPORT = qw();
-our %EXPORT_TAGS = (
-    pflags => [qw(JS_PROP_PRIVATE JS_PROP_READONLY JS_PROP_ACCESSOR)],
-    cflags => [qw(JS_CLASS_NO_INSTANCE)],
-    primitives => [qw(JS_TRUE JS_FALSE JS_NULL)],
-);
-$EXPORT_TAGS{flags} = [@{$EXPORT_TAGS{pflags}}, @{$EXPORT_TAGS{cflags}}];
-{
-    my %seen;
-    push @{$EXPORT_TAGS{all}},
-	grep {!$seen{$_}++} @{$EXPORT_TAGS{$_}} foreach keys %EXPORT_TAGS;
-}
-our @EXPORT_OK = ('jsvisitor', @{$EXPORT_TAGS{all}});
-
-our %ClassMap = ();
-
-require JS::Runtime;
-
-sub get_engine_version {
-    my $version_str = js_get_engine_version();
-
-    return  wantarray ? split /\s+/, $version_str, 3 : $version_str;
-}
-
-sub supports {
-    my $pkg = shift;
-    for (@_) {
-        my $does = $pkg->can("does_support_" . lc($_));
-        croak "I don't know about '$_'" unless defined $does;
-        return '' unless $does->();
-    }
-    return 1;
-}
-
-sub _boot_ {
-    my($class, $version) = @_;
-    no strict 'refs';
-    *{$class.'::dl_load_flags'} = DynaLoader->can('dl_load_flags');
-    $version ||= $VERSION;
-    if(defined &{$class.'::bootstrap'}) {
-	 \&{$class.'::bootstrap'}->($class, $version);
-    } else {
-	my $symbol = "boot_$class"; $symbol =~ s/\W/_/g;
-	my $symref = DynaLoader::dl_find_symbol_anywhere($symbol);
-	if($symref) {
-	    DynaLoader::dl_install_xsub($class."::bootstrap", $symref);
-	    \&{$class."::bootstrap"}->($class, $version);
-	} else {
-	    DynaLoader::bootstrap($class, $version);
-	}
-    }
-}
-
 1;
+
 __END__
 
 =head1 NAME
 
-JS - A bridge between perl and javascript languajes
+JensenShannon - Compute the Jensen-Shannon divergence between two probability distributions 
 
 =head1 SYNOPSIS
 
-    use JS;
-    use Gtk2 -init;
+use strict  ;
+use JS ;   						# Module Jensen_Shannon
 
-    my $ctx = JS->stock_context;
-    my $ctl = $ctx->get_controller;
-    $ctl->install(
-	'Gtk2' => 'Gtk2',
-	'Gtk2.Window' => 'Gtk2::Window',
-	'Gtk2.Button' => 'Gtk2::Button',
-    );
+my $A = "la plume de ma tante est la plus jolie" ; 	# Doc 1
+my $B = "la plume est jolie" ; 					# Doc 2
 
-    $ctx->eval(q|
-	var window = new Gtk2.Window('toplevel');
-	var button = new Gtk2.Button('Quit');
-	button.signal_connect('clicked', function() { Gtk2.main_quit() });
-	window.add(button);
-	window.show_all();
-	Gtk2.main();
-	say('That all folk!');
-    |);
+my %A = unigrammes(split(/ /,$A));			# 1-grammes
+my %B = unigrammes(split(/ /,$B)) ;
+my %P  = () ;  my %Q = () ;				# Distributions de probabilités de P(A) et Q(B)
+foreach my $mot (keys %A) {			
+	$P{$mot} = $A{$mot}/keys %A ; 						
+	if (exists $B{$mot}) 	{ $Q{$mot} = $B{$mot}/keys %B }
+					else { $Q{$mot} = $A{$mot}/keys %A  }  # Smooth simple
+}
+print "Divergence JS = ", JS::jensen_shannon(\%P, \%Q),"\n" ;		# Divergence de Jensen-Shannon	
 
-=head1 INTRODUCTION
-
-Always thought javascript was for web-applications only? well, think again...
-
-Javascript is an easy, elegant and powerful language, known by zillions of
-developers worldwide. Having been born as the scripting language for client
-side Web it was lacking, until now, the library of functions that any general
-purpose language deserves.
-
-Have you enjoyed the functional and prototype based nature of javascript and
-have you dreamed of using javascript to access you favorite database or to
-drive your favorite widget toolkit? Then this module is for you.
-
-In your mod_perl framework, have you ever wanted to allow your users to write
-content handlers in javascript? Then this module is for you.
-
-This modules gives you the power to extend javascript adding every
-functionality that your application needs, the power to embed javascript in
-your Perl applications, even the power to make full-blown javascript
-applications having CPAN's resourcefulness at your fingertips.
-
-With this module you'll be able to use from javascript any subroutine or class
-written in Perl. And likewise, have available in Perl any javascript function
-object, etc...
-
-Variables and values such as primitive types, objects and functions are
-automagically reflected between both environments. All your perl HASHes, ARRAYs
-and objects can be used from javascript and all your javascript classes and
-objects can be used from Perl.
-
-You will be able to even define hibrid classes. Some of the methods defined in
-Perl and others defined in javascript.
-
-This module is not a javascript compiler/interpreter but a bridge between
-Mozilla's SpiderMonkey and Perl engines.
-
-If you are a javascript developer anxious to make full-blown javascript
-applications see the included L<jsp> javascript shell.
+#---------------------- Calcul de 1-grammes
+sub unigrammes {					
+	my %unigrammes = () ;
+	for (my $i = 0; $i < @_; $i++) {		# Parcourir chaque mot de $text
+      		$unigrammes{$_[$i]}++;     		# Stocker le unigramme dans l'index du hachage %unigrammes
+ 	}
+ 	return %unigrammes 
+}
 
 =head1 DESCRIPTION
 
-For use javascript from perl with this module, you normally follow three simple
-steps:
+This module computes Jensen-Shannon divergence between two 
+probabilities distribution.
 
-=over 4
+Examples can be found in the distribution C<eg/> directory and the test
+file.
 
-=item *
+=head1 METHODS
 
-B<Create a context> inside which you'll be able to evaluate javascript code.
-The context holds a I<global object> with javascript's standard constructors
-and functions.
+=head2 x_data
 
-You can create many diferent contexts each with diferent properties.
+  $c->x_data( $y );
+  $x = $c->x_data;
 
-For details on context creation see L<JS::Runtime> and L<JS::Context>
+Return and set the one dimensional array reference data.  This is the
+"unit" array, used as a reference for size and iteration.
 
-=item *
+=head2 y_data
 
-B<Populate the context> with any new functionality your application needs. This
-is done using either the C<bind_*> family of methods from
-L<JS::Context> for simple cases or with the L<JS::Controller>
-object associated to the context for more complex cases.
+  $c->y_data( $y );
+  $x = $c->y_data;
 
-=item *
+Return and set the one dimensional array reference data.  This vector
+is dependent on the x vector.
 
-B<Compile and/or evaluate javascript code> with C<eval>'s family of methods
-and L<JS::Context/call>, that obtain references to javascript values and
-call javascript functions.  L<JS::Context> provides many more methods for
-doing that.
+=head2 size
 
-=back
+  $c->size( $s );
+  $s = $c->size;
 
-Javascript code can re-enter the perl interpreter, for example by calling a
-function defined in perl. The flow of your program will be switching between
-both interpreters freely.
+Return and set the number of array elements.
 
-Values returned by calls to functions and methods of the other interpreter will
-be reflected in a proper way, see L</"DATATYPE CONVERSION> for details.
+=head2 x_rank
 
-Both interpreters can generate exceptions, see L</"EXCEPTION HANDLING> for how
-to handle them.
+  $c->x_rank( $rx );
+  $rx = $c->x_rank;
 
-=head1 DATATYPE CONVERSION
+Return and set the ranks as an array reference.
 
-=head2 From javascript to perl
+=head2 y_rank
 
-In javascript there are two types, B<primitives> and B<objects>. Among the
-primitives, there are B<integers>, B<numbers>, B<strings>, and B<booleans>. All
-numeric and strings primitives are converted I<by value> to simple scalar
-values.
+  $ry = $c->y_rank;
+  $c->y_rank( $ry );
 
-The boolean primitives are wrapped in instances of L<JS::Boolean>, to
-warrant round trip integrity.
+Return and set the ranks as an array reference.
 
-The special javascript value C<undefined>, is converted to perl's C<undef>.
+=head2 x_ties
 
-All objects will be wrapped to instances of L<JS::Object> or one of its
-specialized subclasses: L<JS::Array>, L<JS::Function>,
-L<JS::Error>. They will pass to perl I<by reference>.
+  $xt = $c->x_ties;
+  $c->x_ties( $xt );
 
-See L</%ClassMap> for a way to declare new wrappers when need arise. 
+Return and set the ties as a hash reference.
 
-=head2 From perl to javascript
+=head2 y_ties
 
-All simple (non-references) perl scalar values are converted to javascript
-B<primitives>.  All references will be wrapped in javascript objects, unblessed
-HASH references to instances of C<PerlHash>, unblessed ARRAY references to
-instances of C<PerlArray>, unblessed SCALAR references to instances of
-C<PerlScalar>,  CODE references to instances of C<PerlSub>.
+  $yt = $c->y_ties;
+  $c->y_ties( $yt );
 
-C<PerlSub> instances work just like C<Function> instances (javascript
-functions), so they may be called.
+Return and set the ties as a hash reference.
 
-See L<JS::PerlArray>, L<JS::PerlHash>,
-L<JS::PerlScalar> and L<JS::PerlSub> for details.
+=head2 spearman
 
-All blessed references (perl objects) will be wrapped I<by default> as instaces
-of C<PerlObject>, but you can make arrangements to use a different wrapper for
-specific perl classes. See L<PerlObject> and L<JS::Context/bind_class>
-for details.
+  $n = $c->spearman;
 
-Perl's C<undef> is converted to javascript's C<undefined> value.
+Spearman's rho rank-order correlation is a nonparametric measure of 
+association based on the rank of the data values and is a special 
+case of the Pearson product-moment correlation.
 
-=head2 Round trip integrity
+      6 * sum( (xi - yi)^2 )
+  1 - --------------------------
+             n^3 - n
 
-When a value from one interpreter enters the other it will be converted/wrapped as
-described above. If it gets sent back to its original interpreter JS.pm engine
-warrants you will see its original form.
+Where C<x> and C<y> are the two rank vectors and C<i> is an index 
+from one to B<n> number of samples.
 
-For example, if you send a HASH reference to javascript and then you send it
-back again to perl you'll see exactly the same HASH.
+=head2 kendall
 
-    my $h = { foo=>1, bar=>'hi' };
-    sub pong {
-	my $href = shift;
-	warn "The same\n" if ref($href) eq ref($h);
-    }
-    $ctx->bind_function(pong => \&pong);
-    $ctx->eval(q|     function ping(h) { pong(h); h.foo++; }    |);
-    $ctx->call(ping => $h);
-    
-    print $h->{foo}; # 2
+  $t = $c->kendall;
 
-Similarly for javascript objects sent to perl and then returned. You'll get the
-same object:
+         c - d
+  t = -------------
+      n (n - 1) / 2
 
-    $ctx->bind_function(ping => sub {
-	my $o = shift; $ctx->call(pong => $o); $o->{foo}++;
-    });
+Where B<c> and B<c> are the number of concordant and discordant pairs
+and B<n> is the number of samples.  If there are tied pairs, a
+different (more complicated) denominator is used.
 
-    $ctx->eval(q|
-	var o = {foo:1, bar:'hi'};
-	function pong(h) {
-	    if(h === o) say("The same");
-	}
-	ping(o);
-	say(o.foo); // 2
-    |);
+=head2 csim
 
-=head1 EXCEPTION HANDLING
+  $n = $c->csim;
 
-In javascript a lot of operations can fail in many diferent ways. Even a
-single assignment can fail (remember that in javascript every variable is a
-"property" of something and there may be a getter involved which can throw an
-exception).
+Return the contour similarity index measure.  This is a single 
+dimensional measure of the similarity between two vectors.
 
-When you are running javascript code, all I<untrapped> exceptions will be
-raised on the caller perl side using C<croak>, normally fatal. But you can
-trap them with perl's C<eval>, efectively converting javascript's exceptions
-into perl exceptions.
+This returns a measure in the (inclusive) range C<[-1..1]> and is 
+computed using matrices of binary data representing "higher or lower" 
+values in the original vectors.
 
-Is such cases, in C<$@> you will get a L<JS::Error> instance.
+This measure has been studied in musical contour analysis.
 
-And when from javascript land you reenter perl, and for any reason your perl
-code dies outside an C<eval>, JS will convert the error, in C<$@>, into a
-javascript exception an throw it.
+=head1 FUNCTIONS
 
-So, if a fatal error occurs in perl code called from javascript it can be trapped
-using a C<try ... catch>. If you need to raise an exception from perl you can
-just use C<die($error_to_raise)>, if the error isn't handled in javascript, it
-will be propagated and can be trapped in perl by a C<eval { ...  }> block.
+=head2 rank
 
-This way exceptions can be handled in a regular manner in both environments.
+  $v = [qw(1 3.2 2.1 3.2 3.2 4.3)];
+  $ranks = rank($v);
+  # [1, 4, 2, 4, 4, 6]
+  my( $ranks, $ties ) = rank($v);
+  # [1, 4, 2, 4, 4, 6], { 1=>[], 3.2=>[]}
 
-See L<JS::Error> for more details
+Return an list of an array reference of the ordinal ranks and a hash
+reference of the tied data.
 
-=head1 SIMILAR MODULES
+In the case of a tie in the data (identical values) the rank numbers
+are averaged.  An example will elucidate:
 
-=over 4
+  sorted data:    [ 1.0, 2.1, 3.2, 3.2, 3.2, 4.3 ]
+  ranks:          [ 1,   2,   3,   4,   5,   6   ]
+  tied ranks:     3, 4, and 5
+  tied average:   (3 + 4 + 5) / 3 == 4
+  averaged ranks: [ 1,   2,   4,   4,   4,   6   ]
 
-=item C<JavaScript> by Claes Jakobsson
+=head2 pad_vectors
 
-Thougth the API are similar, there is a fundamental difference: L<JavaScript>
-is mainly a "converter" between types, and this module is a true "reflector",
-so there are a few but important incompatibilities.
+  ( $u, $v ) = pad_vectors( [ 1, 2, 3, 4 ], [ 9, 8 ] );
+  # [1, 2, 3, 4], [9, 8, 0, 0]
 
-JS in fact was born as a fork from Claes's JavaScript perl module. 
+Append zeros to either input vector for all values in the other that 
+do not have a corresponding value.  That is, "pad" the tail of the 
+shorter vector with zero values.
 
-=item C<JavaScript::SpiderMonkey> by Mike Schill and Thomas Busch
+=head2 co_sort
 
-Mainly if you want to run some javascript inside perl.
+  ( $u, $v ) = co_sort( $u, $v );
 
-=item C<JavaScript::V8> by Pawel Murias
+Sort the vectors as two dimensional data-point pairs with B<u> values
+sorted first.
 
-Based in the V8 javascript engine.
+=head2 correlation_matrix
 
-=back
+  $matrix = correlation_matrix( $u );
 
-=head1 INTERFACE
+Return the correlation matrix for a single vector.
 
-=head2 Class methods
+This function builds a square, binary matrix that represents "higher 
+or lower" value within the vector itself.
 
-=over 4
+=head2 sign
 
-=item stock_context( )
+Return 0, 1 or -1 given a number.
 
-Executing javascript code requires a B<context>, that's an instance of a
-L<JS::Context>. One easy way to obtain one is by calling
-C<stock_context>.
+=head1 TO DO
 
-The first time you call C<stock_context> a new context is created, have
-its global object populated with some useful functions and values, and returned.
+Implement other rank correlation measures that are out there...
 
-Every subsecuent call to C<stock_context> returns the same context.
+=head1 SEE ALSO
 
-See L<JS::Runtime::Stock> for details on how the context is populated.
+For the Jensen-Shannon divergence:
 
-This function is intended for when you don't want to worry about contexts and
-runtimes, and just need one populated with common services.
+L<http://en.wikipedia.org/wiki/Jensen%E2%80%93Shannon_divergence>
 
-=item get_engine_version
+=head1 THANK YOU
 
-In scalar context returns a string describing the engine such as C<JavaScript-C
-1.5 2004-09-24>.
+Juan-Manuel Torres-Moreno<lt>juan-manuel.torres@univ-avignon.fr<gt>,
 
-In list context returns the separate parts of the string - engine, version and
-date of build.
+=head1 AUTHOR AND COPYRIGHT
 
-=back
+Juan-Manuel Torres-Moreno <lt>juan-manuel.torres@cpan.org<gt>
 
-=head2 Special variables
+Copyright 2010, Juan-Manuel Torres-Moreno, All Rights Reserved.
 
-=over 4
+=head1 LICENSE
 
-=item %ClassMap
-
-C<%ClassMap> allows you to extend the wrapping system used by JS.
-
-    $JS::ClassMap{Date} => 'My::Date';
-
-Althought javascript doesn't really have a notion of a "class", in SpiderMonkey
-exist the concept of "native classes". JS uses the native class name
-for selecting a proper perl wrapper for javascript objects entering perl.
-
-That way, an C<Array> instance becomes a C<JS::Array>, for example.
-
-JS defines a few of such mappings to provide especialized wrappers for
-some known classed, any other object becomes a simple L<JS::Object>.
-
-If you create new wrapper classes, declare them adding an entry to
-%JS::ClassMap. The common way to do this is:
-
-    package My::NativeFoo;
-    # A wrapper for javascript's NativeFoo
-
-    use base qw(JS::Object); # A must
-
-    # Enter here any method needed in perl
-    # to wrap a NativeFoo instance
-
-    # Register my self
-    $JS::ClassMap{NativeFoo} = __PACKAGE__;
-    
-    1;
-
-So users of you wrapper should do:
-
-    use JS;
-    require My::NativeFoo;
-
-=item $This
-
-The value of javascript's C<this> when in perl code. C<$This> will be C<undef>
-unless your code was called from javascript.
-
-See L<JS::PerlSub> for details.
-
-=back
-
-=begin PRIVATE
-
-=head1 PRIVATE INTERFACE
-
-=over 4
-
-=item get_internal_version
-
-Returns an integer with the value used as C<JS_VERSION> at compile time.
-
-=item js_get_engine_version
-
-Returns a string with the output of C<JS_GetImplementationVersion()>.
-
-=item does_support_utf8
-
-Returns C<PL_sv_yes> if we have compiled SpiderMonkey with
-C<JS_C_STRINGS_ARE_UTF8>. Otherwise returns C<PL_sv_no>.
-
-=item does_support_e4x
-
-Returns C<PL_sv_yes> if we have compiled support for E4X. Otherwise returns
-C<PL_sv_no>.
-
-=item does_support_threading
-
-Returns C<PL_sv_yes> if we have compiled support for threading. Otherwise
-returns C<PL_sv_no>.
-
-=item jsvisitor
-
-TBD
-
-=item supports ( @features )
-
-Checks if all features given in I<@features> are present. Is case insensitive. Supported keys are 
-B<e4x>, B<utf8> and B<threading.
-
-=back
-
-=end PRIVATE
-
-=head1 SUPPORT
-
-There is a mailing-list available at
-L<http://lists.cpan.org/showlist.cgi?name=perl-javascript>.
-
-You may subscribe to the list by sending an empty e-mail to
-C<perl-javascript-subscribe@perl.org>
-
-=head1 CREDITS
-
-See L<CREDITS>
-
-=head1 BUGS AND LIMITATIONS
-
-Please report any bugs or feature requests to C<bug-javascript@rt.cpan.org>, or
-through the web interface at L<http://rt.cpan.org>.
-
-=head1 AUTHORS
-
- Salvador Ortiz <sortiz@cpan.org>
- Miguel Ibarra <mibarra@msg.com.mx>
-
-=head1 LICENCE AND COPYRIGHT
-
-Copyright (c) 2008 - 2010, Salvador Ortiz <sortiz@cpan.org>
-All rights reserved.
-
-Some code adapted from Claes Jakobsson's JavaScript module, 
-Copyright (c) 2001 - 2008, Claes Jakobsson <claesjac@cpan.org>
-
-This module is free software; you can redistribute it and/or modify it under
-the same terms as Perl itself. See L<perlartistic>.
-
-=head1 DISCLAIMER OF WARRANTY
-
-BECAUSE THIS SOFTWARE IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY FOR THE
-SOFTWARE, TO THE EXTENT PERMITTED BY APPLICABLE LAW. EXCEPT WHEN OTHERWISE
-STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES PROVIDE THE
-SOFTWARE "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED OR IMPLIED,
-INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS FOR A PARTICULAR PURPOSE. THE ENTIRE RISK AS TO THE QUALITY AND
-PERFORMANCE OF THE SOFTWARE IS WITH YOU. SHOULD THE SOFTWARE PROVE DEFECTIVE,
-YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR, OR CORRECTION.
-
-IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING WILL ANY
-COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR REDISTRIBUTE THE
-SOFTWARE AS PERMITTED BY THE ABOVE LICENCE, BE LIABLE TO YOU FOR DAMAGES,
-INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING
-OUT OF THE USE OR INABILITY TO USE THE SOFTWARE (INCLUDING BUT NOT LIMITED TO
-LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR
-THIRD PARTIES OR A FAILURE OF THE SOFTWARE TO OPERATE WITH ANY OTHER SOFTWARE),
-EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH
-DAMAGES.
+This program is free software; you can redistribute or modify it under
+the same terms as Perl itself.
 
 =cut
