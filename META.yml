@@ -1,32 +1,27 @@
 ---
 abstract: 'JavaScript Modules on CPAN'
 author:
-  - 'Ingy döt Net <ingy@cpan.org>'
-build_requires:
-  ExtUtils::MakeMaker: 6.42
+  - 'Ingy döt Net <ingy@capn.org>'
+build_requires: {}
 configure_requires:
-  ExtUtils::MakeMaker: 6.42
-distribution_type: module
-generated_by: 'Module::Install version 1.02'
+  ExtUtils::MakeMaker: '6.30'
+dynamic_config: 0
+generated_by: 'Dist::Zilla version 5.019, CPAN::Meta::Converter version 2.132830'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
-  version: 1.4
-module_name: JS
+  version: '1.4'
 name: JS
 no_index:
   directory:
-    - examples
     - inc
     - t
+    - xt
+    - example
 requires:
-  Filter::Util::Call: 0
-  perl: 5.8.0
+  perl: v5.8.1
 resources:
-  homepage: https://github.com/ingydotnet/js-pm/tree
-  license: http://dev.perl.org/licenses/
-  repository:
-    type: git
-    url: git://github.com/ingydotnet/js-pm.git
-    web: https://github.com/ingydotnet/js-pm/tree
-version: 0.18
+  bugtracker: https://github.com/ingydotnet/js-pm/issues
+  homepage: https://github.com/ingydotnet/js-pm
+  repository: https://github.com/ingydotnet/js-pm.git
+version: '0.19'

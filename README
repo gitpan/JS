@@ -1,7 +1,4 @@
-NAME
-    JS - JavaScript Modules on CPAN
-
-SYSNOPSIS
+Sysnopsis
         > # Typical unix command line stuff:
         > sudo cpan JS::jQuery
         ... cpan installs JS-jQuery ...
@@ -21,13 +18,13 @@ SYSNOPSIS
         > cd my/webapp/that/requires/jquery/javascript/
         > ln -s `js-cpan jQuery.js` jQuery.js
 
-DESCRIPTION
+Description
     Some JavaScript modules can be installed from CPAN. This module comes
     with a utility called "js-cpan" that helps you find JavaScript modules
     that have been installed on your system so that you can use them in
     various projects.
 
-EXPLANATION
+Explanation
     The JSAN project (<http://openjsan.org>) has successfully provided much
     of the groundwork to make JavaScript module distributions look and act
     like Perl module distributions.
@@ -38,8 +35,9 @@ EXPLANATION
 
     The Open JSAN project offers the tip off the iceberg in terms of being a
     CPAN for JavaScript. However it has a long way to go and not a lot of
-    community to get it there. CPAN is a good place to put JavaScript
-    modules.
+    community to
+
+          get it there. CPAN is a good place to put JavaScript modules.
 
     Many projects require JavaScript components these days, and it would be
     nice to simply list them in the META.yml of your Perl project
@@ -56,9 +54,9 @@ EXPLANATION
     Others will have only JavaScript components. All JavaScript modules and
     JavaScript-only distributions should have a top-level-namespace of 'JS'.
 
-JS MODULE AUTHOR HOWTO
-    It turns out that Perl's ExtUtils::MakeMaker will install *any* files
-    that you put in the "lib/" directory, into your "perl"'s "sitelib". So
+JS Module Author Howto
+    It turns out that Perl's ExtUtils::MakeMaker will install any files that
+    you put in the "lib/" directory, into your "perl"'s "sitelib". So
     setting up a JavaScript distribution is very similar to setting on a
     Perl one.
 
@@ -98,11 +96,11 @@ JS MODULE AUTHOR HOWTO
     NOTE: There is a working example JavaScript module shipped with "JS.pm"
     in the "examples/JS-Foo-Bar" directory.
 
-AUTHOR
+Author
     Ingy döt Net <ingy@cpan.org>
 
-COPYRIGHT
-    Copyright (c) 2008. Ingy döt Net.
+Copyright
+    Copyright 2008-2014. Ingy döt Net.
 
     This program is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself.
