@@ -1,7 +1,7 @@
 ---
 abstract: 'JavaScript Modules on CPAN'
 author:
-  - 'Ingy döt Net <ingy@capn.org>'
+  - 'Ingy döt Net <ingy@cpan.org>'
 build_requires: {}
 configure_requires:
   ExtUtils::MakeMaker: '6.30'
@@ -24,4 +24,4 @@ resources:
   bugtracker: https://github.com/ingydotnet/js-pm/issues
   homepage: https://github.com/ingydotnet/js-pm
   repository: https://github.com/ingydotnet/js-pm.git
-version: '0.19'
+version: '0.20'
