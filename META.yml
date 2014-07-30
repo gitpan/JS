@@ -24,4 +24,4 @@ resources:
   bugtracker: https://github.com/ingydotnet/js-pm/issues
   homepage: https://github.com/ingydotnet/js-pm
   repository: https://github.com/ingydotnet/js-pm.git
-version: '0.21'
+version: '0.22'
