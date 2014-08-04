@@ -1,4 +1,8 @@
-Sysnopsis
+    JS ==
+
+    JavaScript Modules on CPAN
+
+SYSNOPSIS
         > # Typical unix command line stuff:
         > sudo cpan JS::jQuery
         ... cpan installs JS-jQuery ...
@@ -18,13 +22,13 @@ Sysnopsis
         > cd my/webapp/that/requires/jquery/javascript/
         > ln -s `js-cpan jQuery.js` jQuery.js
 
-Description
+DESCRIPTION
     Some JavaScript modules can be installed from CPAN. This module comes
     with a utility called "js-cpan" that helps you find JavaScript modules
     that have been installed on your system so that you can use them in
     various projects.
 
-Explanation
+EXPLANATION
     The JSAN project (<http://openjsan.org>) has successfully provided much
     of the groundwork to make JavaScript module distributions look and act
     like Perl module distributions.
@@ -52,9 +56,10 @@ Explanation
 
     Some module distributions will have both Perl and JavaScript components.
     Others will have only JavaScript components. All JavaScript modules and
-    JavaScript-only distributions should have a top-level-namespace of 'JS'.
+    JavaScript- only distributions should have a top-level-namespace of
+    'JS'.
 
-JS Module Author Howto
+JS MODULE AUTHOR HOWTO
     It turns out that Perl's ExtUtils::MakeMaker will install any files that
     you put in the "lib/" directory, into your "perl"'s "sitelib". So
     setting up a JavaScript distribution is very similar to setting on a
@@ -96,10 +101,10 @@ JS Module Author Howto
     NOTE: There is a working example JavaScript module shipped with "JS.pm"
     in the "examples/JS-Foo-Bar" directory.
 
-Author
+AUTHOR
     Ingy döt Net <ingy@cpan.org>
 
-Copyright
+COPYRIGHT
     Copyright 2008-2014. Ingy döt Net.
 
     This program is free software; you can redistribute it and/or modify it
