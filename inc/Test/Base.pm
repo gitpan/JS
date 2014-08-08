@@ -1,8 +1,21 @@
 package Test::Base;
-# VERSION
+our $VERSION = '0.76';
 
-use Spiffy 0.30 -Base;
+use Spiffy -Base;
 use Spiffy ':XXX';
+
+my $HAS_PROVIDER;
+BEGIN {
+    $HAS_PROVIDER = eval "require Test::Builder::Provider; 1";
+
+    if ($HAS_PROVIDER) {
+        Test::Builder::Provider->import('provides');
+    }
+    else {
+        *provides = sub { 1 };
+    }
+}
+
 
 my @test_more_exports;
 BEGIN {
@@ -241,10 +254,11 @@ sub have_text_diff {
         $Algorithm::Diff::VERSION >= 1.15;
 }
 
+provides 'is';
 sub is($$;$) {
     (my ($self), @_) = find_my_self(@_);
     my ($actual, $expected, $name) = @_;
-    local $Test::Builder::Level = $Test::Builder::Level + 1;
+    local $Test::Builder::Level = $Test::Builder::Level + 1 unless $HAS_PROVIDER;
     if ($ENV{TEST_SHOW_NO_DIFFS} or
          not defined $actual or
          not defined $expected or
@@ -256,8 +270,8 @@ sub is($$;$) {
     }
     else {
         $name = '' unless defined $name;
-        ok $actual eq $expected,
-           $name . "\n" . Text::Diff::diff(\$expected, \$actual);
+        ok $actual eq $expected, $name;
+        diag Text::Diff::diff(\$expected, \$actual);
     }
 }
 
