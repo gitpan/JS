@@ -21,7 +21,6 @@ inc/Test/Base.pm
 inc/Test/Base/Filter.pm
 lib/JS.pm
 lib/JS.pod
-t/000-compile-modules.t
 t/TestJS.pm
 t/release-pod-syntax.t
 t/test.t
