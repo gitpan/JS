@@ -1,3 +1,7 @@
+0.25 Fri Aug 15 15:57:36 PDT 2014
+ - Add t/000-compile-modules.t
+ - CPAN Day 2014 - 21 Release Salute!
+
 0.24 Fri Aug  8 12:38:00 PDT 2014
  - Switch hashbang to '#!/usr/bin/env perl'
 
